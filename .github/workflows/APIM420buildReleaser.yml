@@ -1,0 +1,176 @@
+name: "Build & Release APIM 4.2.0 Distributed setup"
+
+# Define when to trigger the workflow (on each push to the main branch)
+## Whatever push changes occurs to main branch, this workflow will trigger.
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - .github/workflows/APIM420buildReleaser.yml
+
+  workflow_dispatch:
+    inputs:
+      U2:
+        description: 'U2 Update Level'
+        type: number
+        required: false
+
+jobs:
+  build_distributed_setup:
+    # Set the environment for this job (place where these workflow will run below steps and cmds)
+    runs-on: ubuntu-latest
+    env:
+      GIT_ORG: Ramiiyan
+      REPOSITORY: IoT-Platform
+      ENTRY_POINT: pom.xml
+      TARGET_PATH: target
+      TARGET_FILE_TYPE: jar
+      JDK_VERSION: '17'
+      APIM_VERSION: '4.0.0'
+
+    steps:
+      # Checkout to current
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Use the setup-java action to configure the Java environment
+      - name: 'Set up JDK 17'
+        uses: actions/setup-java@v3
+        with:
+          java-version: ${{ env.JDK_VERSION }}
+          distribution: 'temurin'
+          cache: 'maven'
+      
+      # TODO - Downloading from external location, currently not available.
+      # - name: "Download APIM Pack"
+      #   run: |
+      #     #TODO
+
+      # Create application yml file
+      - name: "Extract the product"
+        run: |
+          unzip Products/wso2am-4.2.0.zip
+          mkdir -p distributed_setup/APIM_420_GW distributed_setup/APIM_420_CP
+
+      - name: "Update the product"
+        if: "${{ github.event.inputs.U2 != '' }}"
+        run: |
+          ./wso2am-4.2.0/bin/wso2update_linux -u <USERNAME> --password <PASSWORD> -l ${{ github.event.inputs.U2 }}
+
+
+      - name: "profile the GW"
+        run: |
+          cp -r wso2am-4.2.0 distributed_setup/APIM_420_GW
+          
+          
+          echo "GW profile created."
+
+      - name: "Profiling CP"
+        run: |
+          cp -r wso2am-4.2.0 distributed_setup/APIM_420_CP
+
+          echo "CP profile created."
+
+          # Define the paths
+          sample_file="src/main/resources/application.yml.sample"
+          output_file="src/main/resources/application.yml"
+          
+          # Check if the sample file exists
+          if [[ ! -f "$sample_file" ]]; then
+            echo "Error: $sample_file not found."
+            exit 1
+          fi
+          
+          escaped_broker_url=$(sed 's/[&/\]/\\&/g' <<< "${{ env.MONGODB_ATLAS_URI }}")
+          
+          # Replace placeholders in the sample file with environment variables
+          sed -e "s|<mqtt_broker_url>|\"${{ env.MQTT_BROKER_URL }}\"|g" \
+              -e "s|<mqtt_client_id>|\"${{ env.MQTT_CLIENT_ID }}\"|g" \
+              -e "s|<mongodb_host>|\"${{ env.MONGODB_HOST }}\"|g" \
+              -e "s|<mongodb_atlas_uri>|\"$escaped_broker_url\"|g" \
+              -e "s|<mongodb_port>|${{ env.MONGODB_PORT }}|g" \
+              -e "s|<mongodb_database_name>|${{ env.MONGODB_DATABASE_NAME }}|g" \
+              -e "s|<socketio_host_url>|\"${{ env.SOCKETIO_HOST_URL }}\"|g" \
+              -e "s|<socketio_server_port>|${{ env.SOCKETIO_PORT }}|g" \
+              "$sample_file" > "$output_file"
+          
+          # Check if the application.yml file created
+          if [[ ! -f "$output_file" ]]; then
+            echo "Error: $sample_file not found."
+            exit 1
+          fi
+          echo "New application.yml file created successfully."
+          cat src/main/resources/application.yml
+
+      # Run Maven command to build the project
+      - name: Build with Maven
+        run: mvn clean install -Dmaven.test.skip=true --file pom.xml
+
+      - name: 'path'
+        run: |
+          ls -lrth
+          echo "**************************"
+          ls -lrth src/main/resources
+          echo "**************************"
+          ls -lrth target
+
+      - name: Release GitHub Artifacts
+        id: release_github_artifacts
+        run: |
+          echo "${{secrets.GIT_ACTION_PAT}}" | gh auth login --with-token # GitHub cli login with PAT
+          current_tag_name=$(gh release view --repo ${{ env.GIT_ORG }}/${{ env.REPOSITORY }} --json tagName --jq '.tagName' || true)
+          
+          if [ -z $current_tag_name ]; then
+            echo "No Release found."
+            gh release create v0.1 --title "${{ env.REPOSITORY }} - v0.1" --notes "Release notes for version v0.1"
+            echo "New Github Release Published. Tag Version:v0.1"
+            updated_tag=0.1
+          else
+            echo "current latest tag name: $current_tag_name"
+            output=$(echo $current_tag_name | grep -oP '\d+\.\d+')
+            echo "OUTPUT: $output"
+            tag_version=$(echo $current_tag_name | grep -oP '\d+\.\d+')
+            IFS="." read -ra ver_compo <<< "$tag_version"
+
+            # Extract major and minor versions
+            major_v="${ver_compo[0]}" 
+            minor_v="${ver_compo[1]}"
+          
+            # Increase the minor version by 1
+            minor_v=$(($minor_v + 1))
+          
+            echo $minor_v
+            # New GitHub Release tag
+            new_github_tag_name="$major_v.$minor_v"
+            echo "Release Tag: $new_github_tag_name"
+          
+            # Release the Pack
+            gh release create $new_github_tag_name --title "${{ env.REPOSITORY }} - $new_github_tag_name" --notes "Release notes for version $new_github_tag_name"
+          
+            updated_tag=$new_github_tag_name
+          fi
+          echo "updated_tag: $updated_tag"
+          gh release upload $updated_tag  ${{ env.TARGET_PATH }}/*.${{ env.TARGET_FILE_TYPE }} --repo ${{ env.GIT_ORG }}/${{ env.REPOSITORY }}
+          echo "Artifacts uploaded to GitHub release."
+
+          echo "NEW_TAG_VERSION=$updated_tag"
+
+  docker_image_build_push:
+    needs: [ maven_build_Release ]
+    uses: ./.github/workflows/dockerReleaser.yml
+    with:
+      git_org: Ramiiyan
+      repository: IoT-Platform
+      docker_username: ${{ vars.DOCKER_USERNAME }}
+    secrets: inherit # ${{ secrets.DOCKER_PASSWORD }}
+
+  oci_docker_cd:
+    needs: [maven_build_Release, docker_image_build_push]
+    uses: ./.github/workflows/dockerOCI-CD.yml
+    with:
+      git_org: Ramiiyan
+      repository: IoT-Platform
+      docker_username: ${{ vars.DOCKER_USERNAME }}
+      oci_docker_host: ${{ vars.OCI_DOCKER_HOST }}
+    secrets: inherit # ${{ secrets.DOCKER_PASSWORD }}
