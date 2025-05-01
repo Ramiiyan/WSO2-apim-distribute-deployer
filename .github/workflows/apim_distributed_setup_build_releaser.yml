@@ -1,0 +1,157 @@
+name: "Build & Release APIM Distributed setup"
+
+# Define when to trigger the workflow (on each push to the main branch)
+## Whatever push changes occurs to main branch, this workflow will trigger.
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - .github/workflows/apim_distributed_setup_build_releaser.yml
+
+  workflow_dispatch:
+    inputs:
+      WSO2_SUBSCRIPTION:
+        description: 'WSO2 Subscription'
+        type: boolean
+        required: false
+        default: false
+      U2:
+        description: 'U2 Update Level(default: latest)'
+        type: number
+        required: false
+
+jobs:
+  build_distributed_setup:
+    # Set the environment for this job (place where these workflow will run below steps and cmds)
+    runs-on: ubuntu-latest
+    env:
+      GIT_ORG: Ramiiyan
+      JDK_VERSION: '17'
+      APIM_VERSION: '4.4.0'
+      DB_CONNECTOR_VERSION: '8.0.32'
+
+    steps:
+      # Checkout to current
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Use the setup-java action to configure the Java environment
+      - name: 'Set up JDK 17'
+        uses: actions/setup-java@v3
+        with:
+          java-version: ${{ env.JDK_VERSION }}
+          distribution: 'temurin'
+      
+      # Download the WSO2 APIM pack
+      - name: "Download APIM Pack"
+        run: |
+          mkdir -p products
+          https://github.com/wso2/product-apim/releases/download/v4.4.0/wso2am-4.4.0.zip
+          wget -q "https://github.com/wso2/product-apim/releases/download/v${{ env.APIM_VERSION }}/wso2am-${{ env.APIM_VERSION }}.zip" -o "products/wso2am-${{ env.APIM_VERSION }}.zip"
+
+
+      - name: "Validate & Extract the product"
+        run: |
+          if [ -f "products/wso2am-${{ env.APIM_VERSION }}.zip" ]; then
+            echo "Product pack downloaded successfully"
+            unzip products/wso2am-${{ env.APIM_VERSION }}.zip
+          else
+            echo "Failed to download product pack."
+            exit 1
+          fi
+
+      # Update the product (if applicable)
+      - name: "Update the product"
+        if: ${{ github.event.inputs.U2 != '' && github.event.inputs.WSO2_SUBSCRIPTION == 'true' }}
+        run: |
+          export WSO2_UPDATES_SKIP_CONFLICTS="true"
+          echo "=========== Updating the U2 Update tool ==========="
+          ./wso2am-${{ env.APIM_VERSION }}/bin/wso2update_linux -u ${{ secrets.SUB_USERNAME }} --password ${{ secrets.SUB_PASSWORD }} || [[ $? -eq 2 ]]
+
+          if [[ -n "${{ github.event.inputs.U2 }}" ]]; then
+            echo "=========== Updating the product to U2 update level: ${{ github.event.inputs.U2 }} ==========="
+            ./wso2am-${{ env.APIM_VERSION }}/bin/wso2update_linux -u ${{ secrets.SUB_USERNAME }} --password ${{ secrets.SUB_PASSWORD }} -l ${{ github.event.inputs.U2 }} || [[ $? -eq 2 ]]
+          else
+            echo "=========== Updating the product to latest update level ==========="
+            ./wso2am-${{ env.APIM_VERSION }}/bin/wso2update_linux -u ${{ secrets.SUB_USERNAME }} --password ${{ secrets.SUB_PASSWORD }} || [[ $? -eq 2 ]]
+          fi
+          echo "=========== Update completed ==========="
+
+      - name: "Create & Profile the GW Node"
+        run: |
+          mkdir -p distributed_setup/APIM_GW
+          cp -r wso2am-${{ env.APIM_VERSION }} distributed_setup/APIM_GW
+          echo "GW Node created."
+
+          echo "=========== Profile Optimizing Gateway Node ==========="
+          sh wso2am-${{ env.APIM_VERSION }}/bin/profileSetup.sh  -Dprofile=gateway-worker
+          echo "=========== GW Profile Optimizing completed ==========="
+
+      - name: "Create & Profile CP Node"
+        run: |
+          mkdir -p distributed_setup/APIM_CP
+          cp -r wso2am-${{ env.APIM_VERSION }} distributed_setup/APIM_CP
+          echo "CP Node created."
+
+          echo "=========== Profile Optimizing Control-Plane Node ==========="
+          sh wso2am-${{ env.APIM_VERSION }}/bin/profileSetup.sh  -Dprofile=control-plane
+          echo "=========== CP Profile Optimizing completed ==========="
+      
+      - name: "Modify Gateway Configs(default)"
+        run: |
+          mv distributed_setup/APIM_GW/wso2am-${{ env.APIM_VERSION }}/repository/conf/deployment.toml distributed_setup/APIM_GW/wso2am-${{ env.APIM_VERSION }}/repository/conf/deployment.toml.bak
+          cp ./Configs/gateway/deployment.toml distributed_setup/APIM_GW/wso2am-${{ env.APIM_VERSION }}/repository/conf/deployment.toml
+          echo "=========== Gateway Configs modified ==========="
+      
+      - name: "Modify Control Plane Configs(default)"
+        run: |
+          mv distributed_setup/APIM_CP/wso2am-${{ env.APIM_VERSION }}/repository/conf/deployment.toml distributed_setup/APIM_CP/wso2am-${{ env.APIM_VERSION }}/repository/conf/deployment.toml.bak
+          cp ./Configs/control-plane/deployment.toml distributed_setup/APIM_CP/wso2am-${{ env.APIM_VERSION }}/repository/conf/deployment.toml
+          echo "=========== Control Plane Configs modified ==========="
+      
+      - name: "Download Database Connector(default:mysql)"
+        run: |
+          wget -q "https://repo1.maven.org/maven2/mysql/mysql-connector-java/$DB_CONNECTOR_VERSION/mysql-connector-java-$DB_CONNECTOR_VERSION.jar"
+          echo "=========== MySQL Connector downloaded ==========="
+
+      - name: "Copy Database Connector to APIM Packs"
+        run: |
+          cp mysql-connector-java-$DB_CONNECTOR_VERSION.jar distributed_setup/APIM_GW/wso2am-${{ env.APIM_VERSION }}/repository/components/lib/
+          cp mysql-connector-java-$DB_CONNECTOR_VERSION.jar distributed_setup/APIM_CP/wso2am-${{ env.APIM_VERSION }}/repository/components/lib/
+          echo "=========== MySQL Connector copied to APIM Packs ==========="
+      
+      - name: Compressed the APIM Packs
+        run: |
+          echo "=========== Compressing the APIM Packs ==========="
+          DIR_NAME="APIM_Distributed_Setup_wso2am-${{ env.APIM_VERSION }}"
+          mkdir -p "$DIR_NAME"
+          zip -r '$DIR_NAME.zip' distributed_setup/APIM_GW distributed_setup/APIM_CP
+          echo "=========== Compressing completed ==========="
+          echo "DIR_NAME=$DIR_NAME" >> $GITHUB_ENV
+          echo "APIM_VERSION=$APIM_VERSION" >> $GITHUB_ENV
+
+      - name: Upload MySQL Dumps as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: distributed_setup
+          path: ${{ env.DIR_NAME }}.zip
+          retention-days: 1
+    outputs:
+      apim_version: ${{ env.APIM_VERSION }}
+
+  release:
+    needs: build_distributed_setup  # Ensure artifacts are built before releasing
+    uses: ./.github/workflows/github-release.yml
+    with:
+      git_org: "Ramiiyan"
+      repository: "wso2-apim-distribute-deployer"
+      artifact_name: "distributed_setup"
+      product: wso2am-${{ needs.build_distributed_setup.outputs.apim_version }}
+      cleanup-artifact: true
+    secrets:
+      GIT_ACTION_PAT: ${{ secrets.GIT_ACTION_PAT }}  
+      
+
+
+          
