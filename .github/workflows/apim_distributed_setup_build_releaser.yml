@@ -6,8 +6,8 @@ on:
   push:
     branches:
       - main
-    paths-ignore:
-      - .github/workflows/apim_distributed_setup_build_releaser.yml
+    # paths-ignore:
+    #   - .github/workflows/apim_distributed_setup_build_releaser.yml
 
   workflow_dispatch:
     inputs:
