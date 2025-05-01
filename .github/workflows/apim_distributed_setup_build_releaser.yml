@@ -100,13 +100,11 @@ jobs:
       
       - name: "Modify Gateway Configs(default)"
         run: |
-          mv distributed_setup/APIM_GW/wso2am-${{ env.APIM_VERSION }}/repository/conf/deployment.toml distributed_setup/APIM_GW/wso2am-${{ env.APIM_VERSION }}/repository/conf/deployment.toml.bak
           cp ./Configs/gateway/deployment.toml distributed_setup/APIM_GW/wso2am-${{ env.APIM_VERSION }}/repository/conf/deployment.toml
           echo "=========== Gateway Configs modified ==========="
       
       - name: "Modify Control Plane Configs(default)"
         run: |
-          mv distributed_setup/APIM_CP/wso2am-${{ env.APIM_VERSION }}/repository/conf/deployment.toml distributed_setup/APIM_CP/wso2am-${{ env.APIM_VERSION }}/repository/conf/deployment.toml.bak
           cp ./Configs/control-plane/deployment.toml distributed_setup/APIM_CP/wso2am-${{ env.APIM_VERSION }}/repository/conf/deployment.toml
           echo "=========== Control Plane Configs modified ==========="
       
@@ -131,7 +129,7 @@ jobs:
           echo "DIR_NAME=$DIR_NAME" >> $GITHUB_ENV
           echo "APIM_VERSION=$APIM_VERSION" >> $GITHUB_ENV
 
-      - name: Upload MySQL Dumps as Artifact
+      - name: Upload Distribute packs as Artifact
         uses: actions/upload-artifact@v4
         with:
           name: distributed_setup
