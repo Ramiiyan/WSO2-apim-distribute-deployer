@@ -115,8 +115,8 @@ jobs:
 
       - name: "Copy Database Connector to APIM Packs"
         run: |
-          cp mysql-connector-java-${{ env.DB_CONNECTOR_VERSION }}.jar distributed_setup/APIM_GW/wso2am-${{ env.APIM_VERSION }}/repository/components/lib/
-          cp mysql-connector-java-${{ env.DB_CONNECTOR_VERSION }}.jar distributed_setup/APIM_CP/wso2am-${{ env.APIM_VERSION }}/repository/components/lib/
+          cp mysql-connector-j-${{ env.DB_CONNECTOR_VERSION }}.jar distributed_setup/APIM_GW/wso2am-${{ env.APIM_VERSION }}/repository/components/lib/
+          cp mysql-connector-j-${{ env.DB_CONNECTOR_VERSION }}.jar distributed_setup/APIM_CP/wso2am-${{ env.APIM_VERSION }}/repository/components/lib/
           echo "=========== MySQL Connector copied to APIM Packs ==========="
       
       - name: Compressed the APIM Packs
