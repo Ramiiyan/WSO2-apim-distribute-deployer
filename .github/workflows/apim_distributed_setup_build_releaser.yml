@@ -47,7 +47,6 @@ jobs:
       - name: "Download APIM Pack"
         run: |
           mkdir -p products
-          https://github.com/wso2/product-apim/releases/download/v4.4.0/wso2am-4.4.0.zip
           wget -q "https://github.com/wso2/product-apim/releases/download/v${{ env.APIM_VERSION }}/wso2am-${{ env.APIM_VERSION }}.zip" -o "products/wso2am-${{ env.APIM_VERSION }}.zip"
 
 
