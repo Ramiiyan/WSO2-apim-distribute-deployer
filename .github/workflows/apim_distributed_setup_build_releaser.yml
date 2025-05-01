@@ -123,7 +123,7 @@ jobs:
         run: |
           echo "=========== Compressing the APIM Packs ==========="
           DIR_NAME="APIM_Distributed_Setup_wso2am-${{ env.APIM_VERSION }}"
-          zip -r -q '$DIR_NAME.zip' distributed_setup/
+          zip -r -q "${DIR_NAME}.zip" distributed_setup/
           ls -l
           echo "=========== Compressing completed ==========="
           echo "DIR_NAME=$DIR_NAME" >> $GITHUB_ENV
