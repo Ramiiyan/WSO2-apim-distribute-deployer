@@ -70,7 +70,7 @@ jobs:
           echo "New GitHub Release created: $new_tag"
 
       - name: Download build artifacts
-        id: artifact-dowload
+        id: artifact-download
         uses: actions/download-artifact@v4
         with:
           name: ${{ inputs.artifact_name }}
@@ -89,5 +89,5 @@ jobs:
             github.rest.actions.deleteArtifact({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              artifact_id: ${{ steps.artifact-upload.outputs.artifact-id }}
+              artifact_id: "${{ steps.artifact-download.outputs.artifact-id }}"
             });
