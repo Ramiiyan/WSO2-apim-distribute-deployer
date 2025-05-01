@@ -112,13 +112,13 @@ jobs:
       
       - name: "Download Database Connector(default:mysql)"
         run: |
-          wget -q "https://repo1.maven.org/maven2/mysql/mysql-connector-java/$DB_CONNECTOR_VERSION/mysql-connector-java-$DB_CONNECTOR_VERSION.jar"
+          wget -q "https://repo1.maven.org/maven2/mysql/mysql-connector-java/${{ env.DB_CONNECTOR_VERSION }}/mysql-connector-java-${{ env.DB_CONNECTOR_VERSION }}.jar"
           echo "=========== MySQL Connector downloaded ==========="
 
       - name: "Copy Database Connector to APIM Packs"
         run: |
-          cp mysql-connector-java-$DB_CONNECTOR_VERSION.jar distributed_setup/APIM_GW/wso2am-${{ env.APIM_VERSION }}/repository/components/lib/
-          cp mysql-connector-java-$DB_CONNECTOR_VERSION.jar distributed_setup/APIM_CP/wso2am-${{ env.APIM_VERSION }}/repository/components/lib/
+          cp mysql-connector-java-${{ env.DB_CONNECTOR_VERSION }}.jar distributed_setup/APIM_GW/wso2am-${{ env.APIM_VERSION }}/repository/components/lib/
+          cp mysql-connector-java-${{ env.DB_CONNECTOR_VERSION }}.jar distributed_setup/APIM_CP/wso2am-${{ env.APIM_VERSION }}/repository/components/lib/
           echo "=========== MySQL Connector copied to APIM Packs ==========="
       
       - name: Compressed the APIM Packs
