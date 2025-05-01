@@ -32,15 +32,15 @@ jobs:
       GIT_ORG: ${{ inputs.git_org }}
       REPOSITORY: ${{ inputs.repository }}
       PRODUCT_VERSION: ${{ inputs.product }}
+      GITHUB_TOKEN: ${{ secrets.GIT_ACTION_PAT }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Authenticate GitHub CLI
-        env:
-          GIT_ACTION_PAT: ${{ secrets.GIT_ACTION_PAT }}
         run: |
-          echo "$GIT_ACTION_PAT" | gh auth login --with-token
+          gh auth setup-git
+          gh auth status
 
       - name: Get latest release tag
         id: get_latest_tag
