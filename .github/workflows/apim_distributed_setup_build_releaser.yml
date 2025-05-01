@@ -54,6 +54,7 @@ jobs:
         run: |
           if [ -f "products/wso2am-${{ env.APIM_VERSION }}.zip" ]; then
             echo "Product pack downloaded successfully"
+            ls -lwrh products
             unzip products/wso2am-${{ env.APIM_VERSION }}.zip
           else
             echo "Failed to download product pack."
