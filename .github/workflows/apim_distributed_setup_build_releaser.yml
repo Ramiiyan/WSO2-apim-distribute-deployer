@@ -47,7 +47,7 @@ jobs:
       - name: "Download APIM Pack"
         run: |
           mkdir -p products
-          wget -q "https://github.com/wso2/product-apim/releases/download/v${{ env.APIM_VERSION }}/wso2am-${{ env.APIM_VERSION }}.zip" -o "products/wso2am-${{ env.APIM_VERSION }}.zip"
+          wget -q "https://github.com/wso2/product-apim/releases/download/v${{ env.APIM_VERSION }}/wso2am-${{ env.APIM_VERSION }}.zip" -O "products/wso2am-${{ env.APIM_VERSION }}.zip"
 
 
       - name: "Validate & Extract the product"
