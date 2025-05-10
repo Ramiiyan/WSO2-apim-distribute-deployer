@@ -82,11 +82,12 @@ jobs:
 
       - name: Clean Up Artifact
         if: ${{ inputs.cleanup-artifact }}
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.actions.deleteArtifact({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              artifact_id: "${{ steps.artifact-download.outputs.artifact-id }}"
-            });
+        run: |
+          echo "Cleaning up artifacts..."
+          # GitHub CLI api
+          # https://cli.github.com/manual/gh_api
+
+          gh api \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            /repos/$GIT_ORG/$REPOSITORY/actions/artifacts
