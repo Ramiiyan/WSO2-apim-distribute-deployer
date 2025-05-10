@@ -87,7 +87,31 @@ jobs:
           # GitHub CLI api
           # https://cli.github.com/manual/gh_api
 
+          # Get the list of artifacts
           gh api \
             -H "Accept: application/vnd.github+json" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             /repos/$GIT_ORG/$REPOSITORY/actions/artifacts
+          
+          # Get the artifact IDs
+          artifact_ids=$(gh api \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            /repos/$GIT_ORG/$REPOSITORY/actions/artifacts | jq -r '.artifacts[] | select(.name == "${{ inputs.artifact_name }}") | .id')
+          
+          # Loop through the artifact IDs and delete them
+          for artifact_id in $artifact_ids; do
+            gh api \
+              -X DELETE \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              /repos/$GIT_ORG/$REPOSITORY/actions/artifacts/$artifact_id
+            echo "Deleted artifact with ID: $artifact_id"
+          done
+          echo "Artifacts cleaned up."
+      - name: Clean up downloaded artifacts
+        if: ${{ inputs.cleanup-artifact }}
+        run: |
+          echo "Cleaning up downloaded artifacts..."
+          rm -rf artifacts/
+          echo "Downloaded artifacts cleaned up."
